@@ -4,22 +4,634 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Creatore di Mappe Concettuali</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Stile generale della pagina */
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            margin: 0;
+            overflow: hidden; /* Nasconde le barre di scorrimento */
+            background-color: #f0f2f5;
+        }
+
+        /* Barre degli strumenti */
+        .toolbar {
+            position: fixed;
+            background-color: white;
+            padding: 10px;
+            border-radius: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+        }
+        
+        #main-toolbar {
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+        }
+
+        #pan-toolbar {
+            bottom: 20px;
+            left: 20px;
+        }
+
+        .toolbar button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #add-label-btn {
+            background-color: #6c757d;
+        }
+
+        .toolbar button:hover {
+            background-color: #0056b3;
+            transform: scale(1.1);
+        }
+        
+        #add-label-btn:hover {
+             background-color: #5a6268;
+        }
+
+        #export-btn {
+            width: auto;
+            border-radius: 20px;
+            padding: 0 15px;
+            font-size: 14px;
+        }
+
+        /* Canvas: l'area di lavoro */
+        #canvas {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            transform-origin: top left;
+            transition: transform 0.3s ease;
+        }
+
+        /* Stile base di un riquadro/nodo */
+        .node {
+            position: absolute;
+            background-color: #ffffff;
+            border: 2px solid #007bff;
+            border-radius: 10px;
+            padding: 20px;
+            min-width: 150px;
+            min-height: 50px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            cursor: move;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+        
+        .node.selected {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.8);
+        }
+
+        .node-content {
+            outline: none;
+            min-width: 140px;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .node-content[contenteditable="true"] {
+            outline: 2px dashed #007bff;
+            outline-offset: 3px;
+        }
+
+        .node-image {
+            max-width: 100%;
+            max-height: 100px;
+            height: auto;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            object-fit: contain;
+        }
+
+        .add-btn {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 24px;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 10;
+        }
+
+        .node:hover .add-btn { opacity: 1; }
+        .add-btn:hover { transform: scale(1.2); }
+        .top { top: -15px; left: 50%; transform: translateX(-50%); }
+        .bottom { bottom: -15px; left: 50%; transform: translateX(-50%); }
+        .left { left: -15px; top: 50%; transform: translateY(-50%); }
+        .right { right: -15px; top: 50%; transform: translateY(-50%); }
+
+        .delete-btn, .edit-btn, .image-btn {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            z-index: 10;
+        }
+        
+        .delete-btn { top: 5px; left: 5px; background-color: #dc3545; font-size: 18px; font-weight: bold; line-height: 24px;}
+        .edit-btn { top: 5px; right: 35px; background-color: #ffc107; font-size: 16px; }
+        .image-btn { top: 5px; right: 65px; background-color: #17a2b8; font-size: 16px; }
+
+        .node:hover .delete-btn, .node:hover .edit-btn, .node:hover .image-btn { opacity: 1; }
+        .delete-btn:hover, .edit-btn:hover, .image-btn:hover { transform: scale(1.2); }
+
+        .color-picker {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 0;
+        }
+
+        #fit-to-screen-btn {
+            font-size: 22px;
+            line-height: 40px;
+        }
+        
+        /* Stile per le etichette flottanti */
+        .floating-label {
+            position: absolute;
+            padding: 5px 10px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            cursor: move;
+            font-size: 14px;
+            z-index: 101;
+            display: flex;
+            align-items: center;
+        }
+        
+        .floating-label.anchored {
+            border: 2px solid #17a2b8;
+            cursor: default;
+        }
+
+        .floating-label > div[contenteditable="true"] {
+            outline: 2px dashed #007bff;
+            cursor: text;
+        }
+        
+        .label-buttons {
+            display: flex;
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        
+        .floating-label:hover .label-buttons {
+            opacity: 1;
+        }
+
+        .label-buttons button {
+            width: 22px;
+            height: 22px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 2px;
+        }
+        
+        .unanchor-btn {
+            background-color: #17a2b8 !important;
+            font-size: 12px;
+        }
+        
+        .unanchor-btn { display: none; }
+        .floating-label.anchored .unanchor-btn { display: flex; }
+
+
+    </style>
 </head>
 <body>
 
-    <div id="toolbar">
+    <div id="main-toolbar" class="toolbar">
+        <button id="add-label-btn" title="Aggiungi Etichetta">T</button>
         <button id="zoom-in-btn">+</button>
         <button id="zoom-out-btn">-</button>
-        <button id="fit-to-screen-btn" title="Centra Vista">⛶</button> <button id="export-btn">Esporta come PNG</button>
+        <button id="fit-to-screen-btn" title="Centra Vista">⛶</button>
     </div>
 
-    <div id="canvas">
-        </div>
+    <div id="pan-toolbar" class="toolbar">
+        <button id="pan-up" title="Sposta in Alto">↑</button>
+        <button id="pan-down" title="Sposta in Basso">↓</button>
+        <button id="pan-left" title="Sposta a Sinistra">←</button>
+        <button id="pan-right" title="Sposta a Destra">→</button>
+    </div>
+
+    <div id="canvas"></div>
 
     <script src="https://unpkg.com/jsplumb@2.15.6/dist/js/jsplumb.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <script src="script.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const canvas = document.getElementById('canvas');
+            let zoomLevel = 1.0;
+            let translateX = 0;
+            let translateY = 0;
+            let nodeIdCounter = 0;
+            let labelIdCounter = 0;
+            let selectedNodes = new Set();
+            let dragStartPositions = new Map();
+
+            const instance = jsPlumb.getInstance({
+                Container: canvas,
+                Connector: ['Flowchart', { cornerRadius: 5 }],
+                Endpoint: 'Blank',
+                PaintStyle: { stroke: '#007bff', strokeWidth: 2 },
+            });
+
+            function updateCanvasTransform() {
+                canvas.style.transform = `translate(${translateX}px, ${translateY}px) scale(${zoomLevel})`;
+                instance.setZoom(zoomLevel);
+            }
+            
+            // Aggiorna la posizione delle etichette ancorate quando la mappa viene ridisegnata
+            instance.bind("repaint", () => {
+                const anchoredLabels = document.querySelectorAll('.floating-label.anchored');
+                anchoredLabels.forEach(label => {
+                    const connId = label.dataset.connectionId;
+                    if (!connId) return;
+                    
+                    const connection = instance.getAllConnections().find(c => c.id === connId);
+                    if (connection) {
+                        updateAnchoredLabelPosition(label, connection);
+                    }
+                });
+            });
+
+
+            function updateAnchoredLabelPosition(label, connection) {
+                const sourcePos = {
+                    x: connection.source.offsetLeft + connection.source.offsetWidth / 2,
+                    y: connection.source.offsetTop + connection.source.offsetHeight / 2
+                };
+                const targetPos = {
+                    x: connection.target.offsetLeft + connection.target.offsetWidth / 2,
+                    y: connection.target.offsetTop + connection.target.offsetHeight / 2
+                };
+
+                const midX = (sourcePos.x + targetPos.x) / 2;
+                const midY = (sourcePos.y + targetPos.y) / 2;
+
+                label.style.left = `${midX - label.offsetWidth / 2}px`;
+                label.style.top = `${midY - label.offsetHeight / 2}px`;
+            }
+
+
+            function createFloatingLabel(x, y, content = 'Etichetta') {
+                const labelId = 'label-' + labelIdCounter++;
+                const labelWrapper = document.createElement('div');
+                labelWrapper.id = labelId;
+                labelWrapper.className = 'floating-label';
+                labelWrapper.style.left = x + 'px';
+                labelWrapper.style.top = y + 'px';
+                
+                const editableText = document.createElement('div');
+                editableText.textContent = content;
+                editableText.setAttribute('contenteditable', 'true');
+                editableText.addEventListener('mousedown', e => e.stopPropagation());
+                
+                const buttonsDiv = document.createElement('div');
+                buttonsDiv.className = 'label-buttons';
+
+                const unanchorBtn = document.createElement('button');
+                unanchorBtn.className = 'unanchor-btn';
+                unanchorBtn.innerHTML = '🔗';
+                unanchorBtn.title = 'Sgancia dalla linea';
+                unanchorBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    delete labelWrapper.dataset.connectionId;
+                    labelWrapper.classList.remove('anchored');
+                    instance.setDraggable(labelWrapper, true);
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'delete-label-btn';
+                deleteBtn.innerHTML = '×';
+                deleteBtn.title = 'Elimina etichetta';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    canvas.removeChild(labelWrapper);
+                };
+                
+                buttonsDiv.appendChild(unanchorBtn);
+                buttonsDiv.appendChild(deleteBtn);
+                labelWrapper.appendChild(editableText);
+                labelWrapper.appendChild(buttonsDiv);
+                canvas.appendChild(labelWrapper);
+
+                instance.draggable(labelWrapper, {
+                    stop: (params) => {
+                        const labelEl = params.el;
+                        if (labelEl.classList.contains('anchored')) return;
+
+                        const labelRect = labelEl.getBoundingClientRect();
+                        const labelCenterX = labelRect.left + labelRect.width / 2;
+                        const labelCenterY = labelRect.top + labelRect.height / 2;
+
+                        let closestConnection = null;
+                        let minDistance = 50; // Soglia di ancoraggio in pixel
+
+                        instance.getAllConnections().forEach(conn => {
+                            const sourceRect = conn.source.getBoundingClientRect();
+                            const targetRect = conn.target.getBoundingClientRect();
+
+                            const midX = (sourceRect.left + sourceRect.width / 2 + targetRect.left + targetRect.width / 2) / 2;
+                            const midY = (sourceRect.top + sourceRect.height / 2 + targetRect.top + targetRect.height / 2) / 2;
+
+                            const distance = Math.sqrt(Math.pow(labelCenterX - midX, 2) + Math.pow(labelCenterY - midY, 2));
+
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                closestConnection = conn;
+                            }
+                        });
+
+                        if (closestConnection) {
+                            labelEl.dataset.connectionId = closestConnection.id;
+                            labelEl.classList.add('anchored');
+                            instance.setDraggable(labelEl, false);
+                            updateAnchoredLabelPosition(labelEl, closestConnection);
+                        }
+                    }
+                });
+                
+                editableText.focus();
+                const range = document.createRange();
+                range.selectNodeContents(editableText);
+                const sel = window.getSelection();
+                sel.removeAllRanges();
+                sel.addRange(range);
+
+                editableText.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        editableText.blur();
+                    }
+                });
+            }
+
+
+            function createNode(x, y, content = 'Nuovo Argomento') {
+                const nodeId = 'node-' + nodeIdCounter++;
+                const node = document.createElement('div');
+                node.id = nodeId;
+                node.className = 'node';
+                node.style.left = x + 'px';
+                node.style.top = y + 'px';
+                
+                node.innerHTML = `
+                    <button class="delete-btn">×</button>
+                    <button class="edit-btn">✎</button> 
+                    <button class="image-btn">🖼️</button> 
+                    <div class="node-content" contenteditable="false">${content}</div> 
+                    <button class="add-btn top" data-direction="top">+</button>
+                    <button class="add-btn bottom" data-direction="bottom">+</button>
+                    <button class="add-btn left" data-direction="left">+</button>
+                    <button class="add-btn right" data-direction="right">+</button>
+                    <input type="color" class="color-picker" value="#007bff">
+                `;
+                canvas.appendChild(node);
+                
+                const contentDiv = node.querySelector('.node-content');
+
+                node.addEventListener('click', (e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        if (selectedNodes.has(nodeId)) {
+                            selectedNodes.delete(nodeId);
+                            node.classList.remove('selected');
+                        } else {
+                            selectedNodes.add(nodeId);
+                            node.classList.add('selected');
+                        }
+                    }
+                });
+
+                canvas.addEventListener('click', (e) => {
+                    if (e.target === canvas) {
+                        selectedNodes.forEach(id => document.getElementById(id)?.classList.remove('selected'));
+                        selectedNodes.clear();
+                    }
+                });
+
+                node.querySelector('.edit-btn').addEventListener('click', () => {
+                    const isEditable = contentDiv.getAttribute('contenteditable') === 'true';
+                    contentDiv.setAttribute('contenteditable', String(!isEditable));
+                    if (!isEditable) contentDiv.focus();
+                });
+
+                node.addEventListener('dblclick', (e) => {
+                    if (!e.target.matches('button, input, .node-content[contenteditable="true"]')) {
+                         contentDiv.setAttribute('contenteditable', 'true');
+                         contentDiv.focus();
+                    }
+                });
+
+                contentDiv.addEventListener('blur', () => contentDiv.setAttribute('contenteditable', 'false'));
+                contentDiv.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); contentDiv.blur(); }});
+
+                node.querySelector('.image-btn').addEventListener('click', () => {
+                    const imageUrl = prompt("Inserisci l'URL dell'immagine:");
+                    if (imageUrl) {
+                        const existingImage = node.querySelector('.node-image');
+                        if (existingImage) existingImage.remove();
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.className = 'node-image';
+                        img.onerror = () => { alert("Impossibile caricare l'immagine."); img.remove(); };
+                        node.insertBefore(img, contentDiv);
+                        instance.revalidate(nodeId);
+                    }
+                });
+
+                node.querySelector('.delete-btn').addEventListener('click', () => {
+                    instance.remove(nodeId);
+                    selectedNodes.delete(nodeId);
+                });
+
+                instance.draggable(nodeId, {
+                    start: (params) => {
+                        dragStartPositions.clear();
+                        const nodesToDrag = selectedNodes.has(params.el.id) ? selectedNodes : new Set([params.el.id]);
+                        nodesToDrag.forEach(id => {
+                            const el = document.getElementById(id);
+                            if (el) dragStartPositions.set(id, { left: el.offsetLeft, top: el.offsetTop });
+                        });
+                    },
+                    drag: (params) => {
+                        const startPosEl = dragStartPositions.get(params.el.id);
+                        if (!startPosEl) return;
+                        const dx = params.pos[0] - startPosEl.left;
+                        const dy = params.pos[1] - startPosEl.top;
+
+                        selectedNodes.forEach(id => {
+                            if (id !== params.el.id) {
+                                const el = document.getElementById(id);
+                                const startPos = dragStartPositions.get(id);
+                                if (el && startPos) {
+                                    el.style.left = (startPos.left + dx) + 'px';
+                                    el.style.top = (startPos.top + dy) + 'px';
+                                    instance.revalidate(el);
+                                }
+                            }
+                        });
+                        instance.revalidate(params.el);
+                    },
+                    stop: () => dragStartPositions.clear()
+                });
+
+                node.querySelectorAll('.add-btn').forEach(btn => {
+                    btn.addEventListener('click', () => addNewNode(node, btn.dataset.direction));
+                });
+                
+                const colorPicker = node.querySelector('.color-picker');
+                colorPicker.addEventListener('input', (event) => {
+                    node.style.borderColor = event.target.value;
+                    instance.select({ source: nodeId }).setPaintStyle({ stroke: event.target.value });
+                });
+                
+                return node;
+            }
+
+            function addNewNode(parentNode, direction) {
+                let x = parentNode.offsetLeft;
+                let y = parentNode.offsetTop;
+                const spacing = 250;
+                
+                switch (direction) {
+                    case 'top': y -= spacing; break;
+                    case 'bottom': y += spacing; break;
+                    case 'left': x -= spacing; break;
+                    case 'right': x += spacing; break;
+                }
+
+                const newNode = createNode(x, y);
+
+                let sourceAnchor, targetAnchor;
+                switch (direction) {
+                    case 'top': sourceAnchor = 'Top'; targetAnchor = 'Bottom'; break;
+                    case 'bottom': sourceAnchor = 'Bottom'; targetAnchor = 'Top'; break;
+                    case 'left': sourceAnchor = 'Left'; targetAnchor = 'Right'; break;
+                    case 'right': sourceAnchor = 'Right'; targetAnchor = 'Left'; break;
+                }
+
+                instance.connect({
+                    source: parentNode.id,
+                    target: newNode.id,
+                    anchors: [sourceAnchor, targetAnchor],
+                    paintStyle: { stroke: parentNode.style.borderColor || '#007bff', strokeWidth: 2 },
+                    overlays: [ ['Arrow', { width: 8, length: 8, location: 1 }] ]
+                });
+            }
+
+            document.getElementById('add-label-btn').addEventListener('click', () => {
+                const canvasRect = canvas.getBoundingClientRect();
+                // Posiziona la nuova etichetta al centro della vista corrente
+                const x = ((window.innerWidth / 2) - translateX) / zoomLevel;
+                const y = ((window.innerHeight / 2) - translateY) / zoomLevel;
+                createFloatingLabel(x, y);
+            });
+
+            document.getElementById('zoom-in-btn').addEventListener('click', () => { zoomLevel = Math.min(2.0, zoomLevel + 0.1); updateCanvasTransform(); });
+            document.getElementById('zoom-out-btn').addEventListener('click', () => { zoomLevel = Math.max(0.3, zoomLevel - 0.1); updateCanvasTransform(); });
+            
+            const panStep = 100;
+            document.getElementById('pan-up').addEventListener('click', () => { translateY += panStep; updateCanvasTransform(); });
+            document.getElementById('pan-down').addEventListener('click', () => { translateY -= panStep; updateCanvasTransform(); });
+            document.getElementById('pan-left').addEventListener('click', () => { translateX += panStep; updateCanvasTransform(); });
+            document.getElementById('pan-right').addEventListener('click', () => { translateX -= panStep; updateCanvasTransform(); });
+
+            document.getElementById('fit-to-screen-btn').addEventListener('click', () => {
+                const elements = document.querySelectorAll('.node, .floating-label');
+                if (elements.length === 0) return;
+
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                elements.forEach(el => {
+                    minX = Math.min(minX, el.offsetLeft);
+                    minY = Math.min(minY, el.offsetTop);
+                    maxX = Math.max(maxX, el.offsetLeft + el.offsetWidth);
+                    maxY = Math.max(maxY, el.offsetTop + el.offsetHeight);
+                });
+
+                const contentWidth = maxX - minX;
+                const contentHeight = maxY - minY;
+                if(contentWidth === 0 || contentHeight === 0) return;
+
+                const padding = 100;
+                const viewWidth = window.innerWidth;
+                const viewHeight = window.innerHeight;
+
+                const scaleX = viewWidth / (contentWidth + padding * 2);
+                const scaleY = viewHeight / (contentHeight + padding * 2);
+                zoomLevel = Math.min(scaleX, scaleY, 1.5);
+
+                translateX = -minX * zoomLevel + (viewWidth - contentWidth * zoomLevel) / 2;
+                translateY = -minY * zoomLevel + (viewHeight - contentHeight * zoomLevel) / 2;
+                
+                updateCanvasTransform();
+            });
+
+            createNode(window.innerWidth / 2 - 200, window.innerHeight / 2 - 40, 'Argomento Principale');
+            updateCanvasTransform();
+        });
+    </script>
 </body>
 </html>
+
